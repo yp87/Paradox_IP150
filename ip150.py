@@ -78,7 +78,9 @@ class Paradox_IP150:
         'Disarm'   : 'd',
         'Arm'      : 'r',
         'Arm_sleep': 'p',
-        'Arm_stay' : 's'
+        'Arm_stay' : 's',
+        'on'       : 'on',
+        'off'      : 'off'
     }
 
     def __init__(self, ip150url):
@@ -187,30 +189,51 @@ class Paradox_IP150:
             raise Paradox_IP150_Error('Could not retrieve status information')
         script = status_parsed.find('script').string
         res = {}
+        res['StatusLive'] = {}
         for table in self._tables_map.keys():
             #Extract the js array for the current "table"
             tmp = self._js2array(self._tables_map[table]['name'], script)
             #Map the extracted machine values to the corresponding human values
-            res[table] = [(i, self._tables_map[table]['map'][x]) for i,x in enumerate(tmp, start=1)]
+            res['StatusLive'][table] = [(i, self._tables_map[table]['map'][x]) for i,x in enumerate(tmp, start=1)]
+        
+        io_sync_page = requests.get(
+            '{}/io_sync.html?msgid=3'.format(self.ip150url), verify=False)
+            
+        io_sync_json = json.loads(io_sync_page.text)
+        
+        state = io_sync_json['status'][1]['level']
+        if state is 1:        
+            res['ioSync'] = 'on'
+        else:
+            res['ioSync'] = 'off'            
         return res
 
     def _get_updates(self, on_update, on_error, userdata, interval):
         try:
             prev_state = {}
+            prev_state['StatusLive'] = {}
+            prev_state['ioSync'] = {}
 
             while not self._stop_updates.wait(interval):
                 updated_state = {}
                 cur_state = self.get_info()
-                for d1 in cur_state.keys():
-                    if d1 in prev_state:
-                        for cur_d2, prev_d2 in zip(cur_state[d1], prev_state[d1]):
+                for d1 in cur_state['StatusLive'].keys():
+                    if d1 in prev_state['StatusLive']:
+                        for cur_d2, prev_d2 in zip(cur_state['StatusLive'][d1], prev_state['StatusLive'][d1]):
                             if cur_d2 != prev_d2:
-                                if d1 in updated_state:
-                                    updated_state[d1].append(cur_d2)
+                                if 'StatusLive' not in updated_state:
+                                    updated_state['StatusLive'] = {}
+                                if d1 in updated_state['StatusLive']:
+                                    updated_state['StatusLive'][d1].append(cur_d2)
                                 else:
-                                    updated_state[d1] = [cur_d2]
+                                    updated_state['StatusLive'][d1] = [cur_d2]
                     else:
-                        updated_state[d1] = cur_state[d1]
+                        if 'StatusLive' not in updated_state:
+                                    updated_state['StatusLive'] = {}                                
+                        updated_state['StatusLive'][d1] = cur_state['StatusLive'][d1]
+
+                if prev_state['ioSync'] is not cur_state['ioSync']:
+                    updated_state['ioSync'] = cur_state['ioSync']
 
                 if len(updated_state) > 0:
                     on_update(updated_state, userdata)
@@ -249,6 +272,10 @@ class Paradox_IP150:
         if action not in self._areas_action_map:
             raise Paradox_IP150_Error('Invalid action "{}" provided. Valid actions are {}'.format(action, list(self._areas_action_map.keys())))
         action = self._areas_action_map[action]
-        act_res = requests.get('{}/statuslive.html'.format(self.ip150url), params={'area': '{:02d}'.format(area), 'value': action}, verify=False)
+
+        if area is 1:
+            act_res = requests.get('{}/io_sync.html?msgid=2&num=1'.format(self.ip150url), verify=False)
+        else: 
+            act_res = requests.get('{}/statuslive.html'.format(self.ip150url), params={'area': '{:02d}'.format(area), 'value': action}, verify=False)
         if act_res.status_code != 200:
             raise Paradox_IP150_Error('Error setting the area action')
