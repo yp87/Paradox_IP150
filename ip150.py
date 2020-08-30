@@ -229,7 +229,7 @@ class Paradox_IP150:
                                     updated_state['StatusLive'][d1] = [cur_d2]
                     else:
                         if 'StatusLive' not in updated_state:
-                                    updated_state['StatusLive'] = {}                                
+                            updated_state['StatusLive'] = {}                                
                         updated_state['StatusLive'][d1] = cur_state['StatusLive'][d1]
 
                 if prev_state['ioSync'] is not cur_state['ioSync']:
