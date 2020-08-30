@@ -67,7 +67,7 @@ class IP150_MQTT():
 							client.publish(self._cfg[d1_map['topic']]+'/'+str(d2[0]), publish_state, 1, True)
         
 		if 'ioSync' in state:
-            client.publish('paradox/zone/state/33', state['ioSync'], 1, True)
+                	client.publish('paradox/zone/state/33', state['ioSync'], 1, True)
         
 	def on_paradox_update_error(self, e, client):
 		# We try to do a proper shutdow,
