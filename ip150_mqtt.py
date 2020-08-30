@@ -46,7 +46,9 @@ class IP150_MQTT():
 		'DISARM'	: 'Disarm',
 		'ARM_AWAY'	: 'Arm',
 		'ARM_NIGHT'	: 'Arm_sleep',
-		'ARM_HOME'	: 'Arm_stay'
+		'ARM_HOME'	: 'Arm_stay',
+        'on': 'on', # For garage door only
+        'off': 'off' # For garage door only
 		}
 
 	def __init__(self, opt_file):
@@ -55,14 +57,18 @@ class IP150_MQTT():
 			self._will = (self._cfg['CTRL_PUBLISH_TOPIC'], 'Disconnected', 1, True)
 
 	def on_paradox_new_state(self, state, client):
-		for d1 in state.keys():
-			d1_map = self._status_map.get(d1,None)
-			if d1_map:
-				for d2 in state[d1]:
-					publish_state = d1_map['map'].get(d2[1],None)
-					if publish_state:
-						client.publish(self._cfg[d1_map['topic']]+'/'+str(d2[0]), publish_state, 1, True)
-
+		if 'StatusLive' in state:
+			for d1 in state['StatusLive'].keys():
+				d1_map = self._status_map.get(d1,None)
+				if d1_map:
+					for d2 in state['StatusLive'][d1]:
+						publish_state = d1_map['map'].get(d2[1],None)
+						if publish_state:
+							client.publish(self._cfg[d1_map['topic']]+'/'+str(d2[0]), publish_state, 1, True)
+        
+		if 'ioSync' in state:
+            client.publish('paradox/zone/state/33', state['ioSync'], 1, True)
+        
 	def on_paradox_update_error(self, e, client):
 		# We try to do a proper shutdow,
 		# like if the user asked us to disconnect via MQTT
